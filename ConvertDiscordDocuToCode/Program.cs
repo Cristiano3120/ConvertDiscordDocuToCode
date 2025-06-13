@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using System.Text.Json.Serialization;
 
 namespace ConvertDiscordDocuToCode
 {
@@ -32,7 +33,7 @@ namespace ConvertDiscordDocuToCode
             List<string> @classCode = [];
             CreateClass(classCode);
 
-            foreach (var copiedLine in lines)
+            foreach (string copiedLine in lines)
             {
                 ConvertLine(classCode, copiedLine);
             }
@@ -43,13 +44,17 @@ namespace ConvertDiscordDocuToCode
         static void ConvertLine(List<string> codeParts, string line)
         {
             string[] parts = line.Split([' ', '\t'], 3, StringSplitOptions.RemoveEmptyEntries);
-            DiscordDataType discordDataType = Enum.Parse<DiscordDataType>($"{parts[1]}");
+            DiscordDataType discordDataType = Enum.Parse<DiscordDataType>($"{parts[1].Replace("?", "")}");
+            bool nullable = CheckForNullable(parts);
 
             AddSummary(codeParts, parts[2]);
             AddJsonPropertyName(codeParts, parts[0]);
             AddConverter(codeParts, discordDataType);
-            AddProperty(codeParts, discordDataType, parts[0]);
+            AddProperty(codeParts, discordDataType, parts[0], nullable);
         }
+
+        static bool CheckForNullable(string[] parts)
+            => parts[0].EndsWith('?') || parts[1].StartsWith('?');
 
         static void OutputDocu(List<string> parts)
         {
@@ -69,9 +74,9 @@ namespace ConvertDiscordDocuToCode
             codeParts.Add("}");
         }
 
-        static void AddProperty(List<string> codeParts, DiscordDataType discordDataType, string jsonName)
+        static void AddProperty(List<string> codeParts, DiscordDataType discordDataType, string jsonName, bool nullable)
         {
-            codeParts.Insert(codeParts.Count - 1, $"{AddTab()}public {ToCSharpType(discordDataType)} {ToPascalCase(jsonName)} " + "{ get; init; }");
+            codeParts.Insert(codeParts.Count - 1, $"{AddTab()}public {ToCSharpType(discordDataType, nullable)} {ToPascalCase(jsonName)} " + "{ get; init; }");
             AddEmptyLine(codeParts);
         }
 
@@ -83,7 +88,14 @@ namespace ConvertDiscordDocuToCode
         }
 
         static void AddJsonPropertyName(List<string> codeParts, string jsonName)
-            => codeParts.Insert(codeParts.Count - 1, $"{AddTab()}[JsonPropertyName(\"{jsonName}\")]");
+        {
+            if (jsonName.EndsWith('?'))
+            {
+                jsonName = jsonName[..^1];
+            }
+
+            codeParts.Insert(codeParts.Count - 1, $"{AddTab()}[JsonPropertyName(\"{jsonName}\")]");
+        }
 
         static void AddConverter(List<string> codeParts, DiscordDataType discordDataType)
         {
@@ -97,52 +109,46 @@ namespace ConvertDiscordDocuToCode
             => codeParts.Insert(codeParts.Count - 1, "");
 
         static string AddTab()
-            => "    ";
+            => "\t";
 
 
         #endregion
 
         #region ToMethods(Converts)
 
-        static string ToCSharpType(DiscordDataType dataType)
+        static string ToCSharpType(DiscordDataType dataType, bool nullable)
         {
             CsharpDataType csharpDataType = (CsharpDataType)dataType;
-            return csharpDataType.ToString()[0..];
+            string dataTypeStr = csharpDataType.ToString()[0..];
+
+            return nullable 
+                ? dataTypeStr + "?"
+                : dataTypeStr;
         }
 
         static string ToPascalCase(string str)
         {
-            StringBuilder stringBuilder = new StringBuilder();
+            StringBuilder stringBuilder = new(str.Length);
+            bool upperNext = true;
 
-            bool firstChar = true;
-            bool nextCharUppercase = false;
             foreach (char c in str)
             {
-                if (firstChar)
-                {
-                    firstChar = false;
-                    stringBuilder.Append(char.ToUpper(c));
+                if (c == '?')
                     continue;
-                }
-
-                if (nextCharUppercase)
-                {
-                    nextCharUppercase = false;
-                    stringBuilder.Append(char.ToUpper(c));
-                    continue;
-                }
 
                 if (c == '_')
                 {
-                    nextCharUppercase = true;
+                    upperNext = true;
                     continue;
                 }
 
-                stringBuilder.Append(c);
+                stringBuilder.Append(upperNext ? char.ToUpperInvariant(c) : c);
+                upperNext = false;
             }
 
             return stringBuilder.ToString();
         }
+
 
         #endregion
     }
