@@ -1,5 +1,4 @@
 ﻿using System.Text;
-using System.Text.Json.Serialization;
 
 namespace ConvertDiscordDocuToCode
 {
@@ -12,14 +11,47 @@ namespace ConvertDiscordDocuToCode
 
         static void Main()
         {
-            Console.Write("Paste the documentation in and then press enter 2 times: ");
-            ConvertDocu();
+            PrintOptions();
+            ConvertDocuToClass();
             Console.WriteLine("");
             Main();
         }
 
-        static void ConvertDocu()
+        static void PrintOptions()
         {
+            Console.WriteLine("Discord documentation to code converter! BY Cristiano3120!");
+            Console.WriteLine("1. Convert to class");
+            Console.WriteLine("2. Convert to enum");
+            Console.WriteLine("3. Convert to Flags-Enum");
+            Console.Write("Enter option: ");
+            ReadOptions();
+        }
+
+        static void ReadOptions()
+        {
+            ConsoleKey key = Console.ReadKey().Key;
+            switch (key)
+            {
+                case ConsoleKey.D1:
+                    Console.WriteLine("\n");
+                    ConvertDocuToClass();
+                    break;
+                case ConsoleKey.D2:
+                    ConvertToEnum();
+                    break;
+                case ConsoleKey.D3:
+                    ConvertToFlagsEnum();
+                    break;
+                default:
+                    Console.WriteLine("Invalid option :(");
+                    PrintOptions();
+                    break;
+            }
+        }
+
+        static void ConvertDocuToClass()
+        {
+            Console.Write("Paste the documentation in and then press enter 2 times: ");
             var lines = new List<string>();
             string? line;
             while ((line = Console.ReadLine()) is not null)
@@ -41,16 +73,39 @@ namespace ConvertDiscordDocuToCode
             OutputDocu(classCode);
         }
 
+        static void ConvertToEnum()
+        {
+            //Musst manchmal in 3 teilen manchmal in 2
+        }
+
+        static void ConvertToFlagsEnum()
+        {
+
+        }
+
         static void ConvertLine(List<string> codeParts, string line)
         {
-            string[] parts = line.Split([' ', '\t'], 3, StringSplitOptions.RemoveEmptyEntries);
-            DiscordDataType discordDataType = Enum.Parse<DiscordDataType>($"{parts[1].Replace("?", "")}");
+            string[] parts = line.Split('\t', 3, StringSplitOptions.RemoveEmptyEntries);
             bool nullable = CheckForNullable(parts);
+            bool convertionSucceded = false;
+            string dataType;
+            
+            if (Enum.TryParse($"{parts[1].Replace("?", "").Replace(" ", "")}", out DiscordDataType discordDataType))
+            {
+                dataType = ToCSharpType(discordDataType, nullable);
+                convertionSucceded = true;
+            }
+            else
+            {
+                dataType = GetCSharpDataType(parts[1]);
+
+            }
 
             AddSummary(codeParts, parts[2]);
             AddJsonPropertyName(codeParts, parts[0]);
-            AddConverter(codeParts, discordDataType);
-            AddProperty(codeParts, discordDataType, parts[0], nullable);
+            if (convertionSucceded)
+                AddConverter(codeParts, discordDataType);
+            AddProperty(codeParts, dataType, parts[0]);
         }
 
         static bool CheckForNullable(string[] parts)
@@ -65,6 +120,34 @@ namespace ConvertDiscordDocuToCode
             }
         }
 
+        static string GetCSharpDataType(string discordDataType)
+        {
+            if (discordDataType.Contains(" object"))
+            {
+                discordDataType = discordDataType.Replace(" object", "");
+            }
+            else if (discordDataType.Contains(" object"))
+            {
+                discordDataType = discordDataType.Replace("object", "");
+            }
+
+            if (discordDataType.Contains("partial"))
+            {
+                discordDataType = discordDataType.Replace("partial", "").Trim();
+            }
+
+            if (discordDataType.StartsWith("array of "))
+            {
+                string innerType = discordDataType[9..];
+                discordDataType = $"{innerType}[]";
+            }
+
+            if (discordDataType == "integer or string")
+                return "string";
+
+            return ToPascalCase(discordDataType);
+        }
+
         #region CreateCodeParts
 
         static void CreateClass(List<string> codeParts)
@@ -74,9 +157,11 @@ namespace ConvertDiscordDocuToCode
             codeParts.Add("}");
         }
 
-        static void AddProperty(List<string> codeParts, DiscordDataType discordDataType, string jsonName, bool nullable)
+        static void AddProperty(List<string> codeParts, string dataType, string jsonName)
         {
-            codeParts.Insert(codeParts.Count - 1, $"{AddTab()}public {ToCSharpType(discordDataType, nullable)} {ToPascalCase(jsonName)} " + "{ get; init; }");
+            jsonName = ToPascalCase(jsonName);
+            jsonName = new string([.. jsonName.TakeWhile(char.IsLetter)]);
+            codeParts.Insert(codeParts.Count - 1, $"{AddTab()}public {dataType} {jsonName} " + "{ get; init; }");
             AddEmptyLine(codeParts);
         }
 
@@ -89,11 +174,7 @@ namespace ConvertDiscordDocuToCode
 
         static void AddJsonPropertyName(List<string> codeParts, string jsonName)
         {
-            if (jsonName.EndsWith('?'))
-            {
-                jsonName = jsonName[..^1];
-            }
-
+            jsonName = new string([.. jsonName.TakeWhile(x => char.IsLetter(x) || x == '_')]);
             codeParts.Insert(codeParts.Count - 1, $"{AddTab()}[JsonPropertyName(\"{jsonName}\")]");
         }
 
@@ -116,14 +197,13 @@ namespace ConvertDiscordDocuToCode
 
         #region ToMethods(Converts)
 
-        static string ToCSharpType(DiscordDataType dataType, bool nullable)
+        static string ToCSharpType(DiscordDataType discordDataType, bool nullable)
         {
-            CsharpDataType csharpDataType = (CsharpDataType)dataType;
-            string dataTypeStr = csharpDataType.ToString()[0..];
+            CsharpDataType csharpDataType = (CsharpDataType)discordDataType;
 
-            return nullable 
-                ? dataTypeStr + "?"
-                : dataTypeStr;
+            return nullable
+                ? csharpDataType.ToString() + "?"
+                : csharpDataType.ToString();
         }
 
         static string ToPascalCase(string str)
@@ -133,10 +213,7 @@ namespace ConvertDiscordDocuToCode
 
             foreach (char c in str)
             {
-                if (c == '?')
-                    continue;
-
-                if (c == '_')
+                if (c == '_' || c == ' ' || c == '?')
                 {
                     upperNext = true;
                     continue;
@@ -148,7 +225,6 @@ namespace ConvertDiscordDocuToCode
 
             return stringBuilder.ToString();
         }
-
 
         #endregion
     }

@@ -5,6 +5,8 @@
         @snowflake,
         @string,
         @integer,
-        @boolean
+        @boolean,
+        @ISO8601timestamp,
+        @IntegerOrString
     }
 }

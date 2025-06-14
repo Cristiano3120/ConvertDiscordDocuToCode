@@ -6,5 +6,6 @@
         @string,
         @int,
         @bool,
+        @DateTimeOffset,
     }
 }
