@@ -149,7 +149,7 @@ namespace ConvertDiscordDocuToCode
             {
                 discordDataType = discordDataType.Replace("Map of", "", StringComparison.OrdinalIgnoreCase).Trim();
                 string[] parts = discordDataType.Split(" ", 3);
-                discordDataType = $"Dictonary<{parts[0]}, {parts[2]}>";
+                discordDataType = $"Dictionary<{parts[0]}, {parts[2]}>";
             }
 
             if (discordDataType.Contains("IS08601 timestamp", StringComparison.OrdinalIgnoreCase))
