@@ -97,8 +97,7 @@ namespace ConvertDiscordDocuToCode
             }
             else
             {
-                dataType = GetCSharpDataType(parts[1]);
-
+                dataType = GetCSharpDataType(parts[1], nullable);
             }
 
             AddSummary(codeParts, parts[2]);
@@ -109,7 +108,7 @@ namespace ConvertDiscordDocuToCode
         }
 
         static bool CheckForNullable(string[] parts)
-            => parts[0].EndsWith('?') || parts[1].StartsWith('?');
+            => parts[0].Contains('?') || parts[1].StartsWith('?');
 
         static void OutputDocu(List<string> parts)
         {
@@ -120,7 +119,7 @@ namespace ConvertDiscordDocuToCode
             }
         }
 
-        static string GetCSharpDataType(string discordDataType)
+        static string GetCSharpDataType(string discordDataType, bool nullable)
         {
             if (discordDataType.Contains(" object", StringComparison.OrdinalIgnoreCase))
             {
@@ -141,16 +140,32 @@ namespace ConvertDiscordDocuToCode
                 string innerType = discordDataType[9..];
                 discordDataType = $"{innerType}[]";
             }
-
-            if (discordDataType.StartsWith("List of ", StringComparison.OrdinalIgnoreCase))
+            else if (discordDataType.StartsWith("List of ", StringComparison.OrdinalIgnoreCase))
             {
                 string innerType = discordDataType[8..];
                 discordDataType = $"List<{innerType}>";
             }
+            else if (discordDataType.StartsWith("Map of ", StringComparison.OrdinalIgnoreCase))
+            {
+                discordDataType = discordDataType.Replace("Map of", "", StringComparison.OrdinalIgnoreCase).Trim();
+                string[] parts = discordDataType.Split(" ", 3);
+                discordDataType = $"Dictonary<{parts[0]}, {parts[2]}>";
+            }
 
-
+            if (discordDataType.Contains("IS08601 timestamp", StringComparison.OrdinalIgnoreCase))
+            {
+                discordDataType = "DateTimeOffset";
+            }
+            
+            if (nullable)
+            {
+                discordDataType += "?";
+            }
+            
             if (discordDataType == "integer or string")
-                return "string";
+                return nullable == true
+                    ? "string?"
+                    : "string";
 
             return ToPascalCase(discordDataType);
         }
@@ -229,6 +244,9 @@ namespace ConvertDiscordDocuToCode
                 stringBuilder.Append(upperNext ? char.ToUpperInvariant(c) : c);
                 upperNext = false;
             }
+
+            if (str.Last() == '?')
+                stringBuilder.Append('?');
 
             return stringBuilder.ToString();
         }
