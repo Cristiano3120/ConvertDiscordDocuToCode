@@ -7,5 +7,6 @@
         @int,
         @bool,
         @DateTimeOffset,
+        @float
     }
 }

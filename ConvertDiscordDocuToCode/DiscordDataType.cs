@@ -7,6 +7,6 @@
         @integer,
         @boolean,
         @ISO8601timestamp,
-        @IntegerOrString
+        @float
     }
 }

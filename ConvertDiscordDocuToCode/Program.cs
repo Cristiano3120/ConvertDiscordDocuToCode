@@ -138,18 +138,18 @@ namespace ConvertDiscordDocuToCode
             if (discordDataType.StartsWith("array of ", StringComparison.OrdinalIgnoreCase))
             {
                 string innerType = discordDataType[9..];
-                discordDataType = $"{innerType}[]";
+                discordDataType = $"{ToCSharpType(innerType)}[]";
             }
             else if (discordDataType.StartsWith("List of ", StringComparison.OrdinalIgnoreCase))
             {
                 string innerType = discordDataType[8..];
-                discordDataType = $"List<{innerType}>";
+                discordDataType = $"List<{ToCSharpType(innerType)}>";
             }
             else if (discordDataType.StartsWith("Map of ", StringComparison.OrdinalIgnoreCase))
             {
                 discordDataType = discordDataType.Replace("Map of", "", StringComparison.OrdinalIgnoreCase).Trim();
                 string[] parts = discordDataType.Split(" ", 3);
-                discordDataType = $"Dictionary<{parts[0]}, {parts[2]}>";
+                discordDataType = $"Dictionary<{ToCSharpType(parts[0])}, {ToCSharpType(parts[2])}>";
             }
 
             if (discordDataType.Contains("IS08601 timestamp", StringComparison.OrdinalIgnoreCase))
@@ -157,12 +157,12 @@ namespace ConvertDiscordDocuToCode
                 discordDataType = "DateTimeOffset";
             }
             
-            if (nullable)
+            if (nullable && discordDataType.Last() != '?')
             {
                 discordDataType += "?";
             }
             
-            if (discordDataType == "integer or string")
+            if (discordDataType is "integer or string" or "integer or string?")
                 return nullable == true
                     ? "string?"
                     : "string";
@@ -226,6 +226,16 @@ namespace ConvertDiscordDocuToCode
             return nullable
                 ? csharpDataType.ToString() + "?"
                 : csharpDataType.ToString();
+        }
+
+        static string ToCSharpType(string str)
+        {
+            if (Enum.TryParse<CsharpDataType>(str, out CsharpDataType dataType))
+            {
+                return dataType.ToString();
+            }
+
+            return str;
         }
 
         static string ToPascalCase(string str)
