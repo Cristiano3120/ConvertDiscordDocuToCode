@@ -122,25 +122,32 @@ namespace ConvertDiscordDocuToCode
 
         static string GetCSharpDataType(string discordDataType)
         {
-            if (discordDataType.Contains(" object"))
+            if (discordDataType.Contains(" object", StringComparison.OrdinalIgnoreCase))
             {
-                discordDataType = discordDataType.Replace(" object", "");
+                discordDataType = discordDataType.Replace(" object", "", StringComparison.OrdinalIgnoreCase);
             }
-            else if (discordDataType.Contains(" object"))
+            else if (discordDataType.Contains(" objects", StringComparison.OrdinalIgnoreCase))
             {
-                discordDataType = discordDataType.Replace("object", "");
-            }
-
-            if (discordDataType.Contains("partial"))
-            {
-                discordDataType = discordDataType.Replace("partial", "").Trim();
+                discordDataType = discordDataType.Replace("objects", "", StringComparison.OrdinalIgnoreCase);
             }
 
-            if (discordDataType.StartsWith("array of "))
+            if (discordDataType.Contains("partial", StringComparison.OrdinalIgnoreCase))
+            {
+                discordDataType = discordDataType.Replace("partial", "", StringComparison.OrdinalIgnoreCase).Trim();
+            }
+
+            if (discordDataType.StartsWith("array of ", StringComparison.OrdinalIgnoreCase))
             {
                 string innerType = discordDataType[9..];
                 discordDataType = $"{innerType}[]";
             }
+
+            if (discordDataType.StartsWith("List of ", StringComparison.OrdinalIgnoreCase))
+            {
+                string innerType = discordDataType[8..];
+                discordDataType = $"List<{innerType}>";
+            }
+
 
             if (discordDataType == "integer or string")
                 return "string";
